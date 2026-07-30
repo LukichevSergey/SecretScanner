@@ -1,7 +1,7 @@
 """
 Modern Interactive HTML Report Generator for SecretScanner.
 Creates a self-contained, responsive dashboard with filtering, search,
-collapsible 20-line code context windows, and risk indicator badges.
+collapsible code context windows, and risk indicator badges.
 """
 
 from __future__ import annotations
@@ -37,6 +37,15 @@ def generate_html_report(report: ScanReport, output_path: Path | str) -> Path:
         before_lines = "\n".join(html.escape(l) for l in f.context.lines_before)
         matched_line = html.escape(f.context.line_content)
         after_lines = "\n".join(html.escape(l) for l in f.context.lines_after)
+        has_context = bool(f.context.lines_before or f.context.lines_after)
+        context_label = "Surrounding Code Context" if has_context else "Matched Line"
+        code_block_lines = []
+        if before_lines:
+            code_block_lines.append(before_lines)
+        code_block_lines.append(f'<mark class="highlight-line">{f.line_number:4d} | {matched_line}</mark>')
+        if after_lines:
+            code_block_lines.append(after_lines)
+        code_block_content = "\n".join(code_block_lines)
 
         commit_info = ""
         if f.commit_hash:
@@ -73,10 +82,8 @@ def generate_html_report(report: ScanReport, output_path: Path | str) -> Path:
                 </div>
 
                 <div class="context-container">
-                    <div class="context-header">20-Line Surrounding Context (Line {f.line_number})</div>
-                    <pre class="code-block"><code>{before_lines}
-<mark class="highlight-line">{f.line_number:4d} | {matched_line}</mark>
-{after_lines}</code></pre>
+                    <div class="context-header">{context_label} (Line {f.line_number})</div>
+                    <pre class="code-block"><code>{code_block_content}</code></pre>
                 </div>
             </div>
         </div>

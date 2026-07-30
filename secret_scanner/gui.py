@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 import threading
 import time
 import webbrowser
@@ -11,6 +14,8 @@ from tkinter import filedialog, messagebox
 
 from secret_scanner.config import default_config
 from secret_scanner.scanner import SecretScannerEngine
+
+SETTINGS_PATH = Path.home() / ".secretscanner" / "gui_settings.json"
 
 
 BG = "#050810"
@@ -112,8 +117,10 @@ class SecretScannerGUI(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("SecretScanner // Security Audit Console")
-        self.geometry("1080x780")
-        self.minsize(920, 680)
+        window_w = min(1180, int(self.winfo_screenwidth() * 0.9))
+        window_h = min(1000, int(self.winfo_screenheight() * 0.88))
+        self.geometry(f"{window_w}x{window_h}")
+        self.minsize(min(1040, window_w), min(840, window_h))
         self.configure(bg=BG)
 
         self.project_path_var = tk.StringVar()
@@ -128,6 +135,7 @@ class SecretScannerGUI(tk.Tk):
         self.fmt_json_var = tk.BooleanVar(value=True)
         self.fmt_md_var = tk.BooleanVar(value=True)
         self.fmt_txt_var = tk.BooleanVar(value=True)
+        self.brief_report_var = tk.BooleanVar(value=False)
         self.enable_git_var = tk.BooleanVar(value=True)
         self.enable_entropy_var = tk.BooleanVar(value=True)
         self.entropy_threshold_var = tk.DoubleVar(value=4.5)
@@ -136,7 +144,10 @@ class SecretScannerGUI(tk.Tk):
         self.last_report_path: Path | None = None
         self._cursor_on = True
 
+        self._load_settings()
         self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.createcommand("tk::mac::Quit", self._on_close)
         self.after(600, self._blink_cursor)
 
     # ---------------------------------------------------------------- widgets
@@ -262,8 +273,8 @@ class SecretScannerGUI(tk.Tk):
         root = tk.Frame(self, bg=BG, padx=28, pady=24)
         root.pack(fill=tk.BOTH, expand=True)
         root.columnconfigure(0, weight=1)
-        root.rowconfigure(1, weight=1)
-        root.rowconfigure(2, weight=1)
+        root.rowconfigure(1, weight=0)  # workspace keeps its natural size, never gets compressed
+        root.rowconfigure(2, weight=1)  # log panel absorbs any extra/short space
 
         # header ------------------------------------------------------------
         header = tk.Frame(root, bg=BG)
@@ -361,6 +372,10 @@ class SecretScannerGUI(tk.Tk):
             self._check(formats, label, variable).grid(
                 row=index // 2, column=index % 2, sticky="w", padx=(0, 16), pady=4
             )
+        tk.Frame(output_body, bg=BORDER, height=1).pack(fill=tk.X, pady=(12, 10))
+        self._check(
+            output_body, "Краткий отчёт · без контекста строк", self.brief_report_var
+        ).pack(anchor="w")
 
         engine_panel, engine_body = self._panel(
             right, "04", "ДВИЖОК СКАНИРОВАНИЯ", "Настройки по умолчанию подходят для большинства проектов."
@@ -472,6 +487,7 @@ class SecretScannerGUI(tk.Tk):
         if not path_str or not Path(path_str).exists():
             messagebox.showerror("Нужна папка проекта", "Выберите существующую папку проекта перед запуском аудита.")
             return
+        self._save_settings()
         self.start_btn.config(state=tk.DISABLED)
         self.open_report_btn.config(state=tk.DISABLED)
         self._set_status("СКАНИРОВАНИЕ…", CYAN)
@@ -493,10 +509,11 @@ class SecretScannerGUI(tk.Tk):
             config.enable_entropy = self.enable_entropy_var.get()
             config.entropy_threshold = self.entropy_threshold_var.get()
             config.max_workers = self.workers_var.get()
+            config.context_lines = 0 if self.brief_report_var.get() else 20
             out_dir = self.output_dir_var.get().strip()
             out_path = Path(out_dir).resolve() if out_dir else target_path
             report = SecretScannerEngine(config).run(output_dir=out_path)
-            self.last_report_path = out_path / "report.html"
+            self.last_report_path = Path(report.output_dir) / "report.html"
             self.after(0, self._scan_completed_success, report)
         except Exception as err:
             self.after(0, self._scan_completed_error, str(err))
@@ -524,10 +541,63 @@ class SecretScannerGUI(tk.Tk):
         messagebox.showerror("Ошибка", f"Произошла ошибка при аудите:\n{error_msg}")
 
     def _open_html_report(self) -> None:
-        if self.last_report_path and self.last_report_path.exists():
-            webbrowser.open(self.last_report_path.resolve().as_uri())
-        else:
+        if not (self.last_report_path and self.last_report_path.exists()):
             messagebox.showerror("Отчёт не найден", "Файл report.html не найден. Проверьте, что формат HTML был включён.")
+            return
+        try:
+            if sys.platform == "darwin":
+                subprocess.run(["open", str(self.last_report_path)], check=True)
+            else:
+                webbrowser.open(self.last_report_path.resolve().as_uri())
+        except Exception as err:
+            messagebox.showerror("Не удалось открыть отчёт", f"Не удалось открыть report.html:\n{err}")
+
+    # --------------------------------------------------------------- settings
+
+    def _load_settings(self) -> None:
+        try:
+            data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        self.project_path_var.set(data.get("project_path", self.project_path_var.get()))
+        self.output_dir_var.set(data.get("output_dir", self.output_dir_var.get()))
+        self.excluded_dirs_var.set(data.get("excluded_dirs", self.excluded_dirs_var.get()))
+        self.excluded_files_var.set(data.get("excluded_files", self.excluded_files_var.get()))
+        self.fmt_html_var.set(data.get("fmt_html", self.fmt_html_var.get()))
+        self.fmt_json_var.set(data.get("fmt_json", self.fmt_json_var.get()))
+        self.fmt_md_var.set(data.get("fmt_md", self.fmt_md_var.get()))
+        self.fmt_txt_var.set(data.get("fmt_txt", self.fmt_txt_var.get()))
+        self.brief_report_var.set(data.get("brief_report", self.brief_report_var.get()))
+        self.enable_git_var.set(data.get("enable_git", self.enable_git_var.get()))
+        self.enable_entropy_var.set(data.get("enable_entropy", self.enable_entropy_var.get()))
+        self.entropy_threshold_var.set(data.get("entropy_threshold", self.entropy_threshold_var.get()))
+        self.workers_var.set(data.get("workers", self.workers_var.get()))
+
+    def _save_settings(self) -> None:
+        data = {
+            "project_path": self.project_path_var.get(),
+            "output_dir": self.output_dir_var.get(),
+            "excluded_dirs": self.excluded_dirs_var.get(),
+            "excluded_files": self.excluded_files_var.get(),
+            "fmt_html": self.fmt_html_var.get(),
+            "fmt_json": self.fmt_json_var.get(),
+            "fmt_md": self.fmt_md_var.get(),
+            "fmt_txt": self.fmt_txt_var.get(),
+            "brief_report": self.brief_report_var.get(),
+            "enable_git": self.enable_git_var.get(),
+            "enable_entropy": self.enable_entropy_var.get(),
+            "entropy_threshold": self.entropy_threshold_var.get(),
+            "workers": self.workers_var.get(),
+        }
+        try:
+            SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+            SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _on_close(self) -> None:
+        self._save_settings()
+        self.destroy()
 
 
 def launch_gui() -> None:

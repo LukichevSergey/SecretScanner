@@ -76,20 +76,23 @@ class SecretScannerEngine:
         )
         stats.update_with_findings(sorted_findings)
 
-        # 5. Build Report Object
+        # 5. Resolve the output directory before building the report so the
+        #    actual write location (including the cwd fallback) is recorded.
+        out_path = Path(output_dir) if output_dir else self.config.project_path
+        if not out_path.is_dir():
+            out_path = Path.cwd()
+
+        # 6. Build Report Object
         timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         report = ScanReport(
             stats=stats,
             findings=sorted_findings,
             scanned_path=str(self.config.project_path),
             scan_timestamp=timestamp_str,
+            output_dir=str(out_path),
         )
 
-        # 6. Generate output reports conditionally
-        out_path = Path(output_dir) if output_dir else self.config.project_path
-        if not out_path.is_dir():
-            out_path = Path.cwd()
-
+        # 7. Generate output reports conditionally
         if self.config.generate_json:
             generate_json_report(report, out_path / "report.json")
         if self.config.generate_html:
@@ -100,7 +103,7 @@ class SecretScannerEngine:
             generate_text_report(report, out_path / "report.txt")
 
 
-        # 7. Output summary to console
+        # 8. Output summary to console
         print_console_summary(report)
 
         return report

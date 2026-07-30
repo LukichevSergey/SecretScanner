@@ -55,6 +55,33 @@ class TestReports(unittest.TestCase):
             self.assertTrue(out_file.exists())
             self.assertIn("SecretScanner Security Audit", out_file.read_text())
 
+    def test_html_report_brief_mode_omits_context(self):
+        brief_finding = Finding(
+            finding_type="OpenAI API Key",
+            risk_level=RiskLevel.CRITICAL,
+            description="Detected OpenAI key.",
+            file_path="Config/Secrets.swift",
+            line_number=10,
+            matched_string="sk-proj-****1234",
+            recommendation="Store in Keychain.",
+            context=MatchContext(line_content='let key = "sk-proj-1234"', line_number=10),
+            rule_id="API-001",
+        )
+        stats = ScanStats(files_scanned=1, lines_scanned=10)
+        stats.update_with_findings([brief_finding])
+        report = ScanReport(
+            stats=stats,
+            findings=[brief_finding],
+            scanned_path="/tmp/test_proj",
+            scan_timestamp="2026-07-30 20:00:00",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = Path(tmpdir) / "report.html"
+            generate_html_report(report, out_file)
+            content = out_file.read_text()
+            self.assertIn("Matched Line", content)
+            self.assertNotIn("Surrounding Code Context", content)
+
     def test_markdown_report_generation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             out_file = Path(tmpdir) / "report.md"

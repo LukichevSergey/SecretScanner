@@ -206,6 +206,7 @@ class ScanReport:
     findings: List[Finding]
     scanned_path: str
     scan_timestamp: str
+    output_dir: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert entire report to dictionary."""

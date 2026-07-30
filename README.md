@@ -59,8 +59,10 @@ python3 scanner.py --gui
    - **Excluded Directories**: Add custom folders to skip (e.g. `DerivedData, Pods, Carthage, build, MyExcludedFolder`).
    - **Excluded Files**: Add custom files or patterns to ignore (e.g. `Podfile.lock, MySecretsMock.swift, *.testdata`).
 3. **Interactive Control & Options**: Toggle Git history analysis, adjust Shannon entropy thresholds, and control thread counts.
-4. **Live Execution Console**: Real-time log output displaying progress, findings breakdown, and errors.
-5. **One-Click HTML Report Viewer**: Opens `report.html` directly in your default browser.
+4. **Brief Report Mode**: Toggle "Краткий отчёт" to strip the 20-line before/after code context and keep only the matched secret line — useful for smaller, easier-to-skim reports.
+5. **Live Execution Console**: Real-time log output displaying progress, findings breakdown, and errors.
+6. **One-Click HTML Report Viewer**: Opens `report.html` directly in your default browser.
+7. **Persistent Settings**: Every field and checkbox (project/output folders, exclusions, report formats, engine options) is remembered across restarts, stored in `~/.secretscanner/gui_settings.json`.
 
 
 ```bash
