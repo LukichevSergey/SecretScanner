@@ -1,0 +1,6 @@
+# SecretScanner Requirements
+# Core functionality uses Python 3.12+ Standard Library (zero external dependencies required for standard execution)
+
+# Development & Testing dependencies
+pytest>=8.0.0
+pytest-cov>=4.1.0
