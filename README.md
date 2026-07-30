@@ -160,6 +160,21 @@ SecretFinder/
 
 ---
 
+## 📦 Building the macOS App Yourself
+
+The `.dmg` on the [Releases page](https://github.com/LukichevSergey/SecretScanner/releases) is built with `py2app`:
+
+```bash
+python3 -m venv .build-venv
+.build-venv/bin/pip install py2app
+.build-venv/bin/python setup.py py2app
+# -> dist/SecretScanner.app
+```
+
+Use a Python with Tk 8.6+ (see the GUI note above) so the bundled app renders correctly.
+
+---
+
 ## 📊 Reports Generated
 
 After completing an audit scan, SecretScanner creates 4 report files in the output directory:
