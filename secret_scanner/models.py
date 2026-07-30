@@ -70,6 +70,7 @@ class PatternRule:
     recommendation: str
     file_patterns: Optional[List[str]] = None
     is_swift_rule: bool = False
+    category: str = "General"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert rule to dictionary."""
@@ -82,6 +83,7 @@ class PatternRule:
             "recommendation": self.recommendation,
             "file_patterns": self.file_patterns,
             "is_swift_rule": self.is_swift_rule,
+            "category": self.category,
         }
 
 
@@ -175,16 +177,33 @@ class ScannerConfig:
         "Cartfile.resolved", "Package.resolved"
     })
     included_extensions: Set[str] = field(default_factory=lambda: {
-        ".swift", ".h", ".m", ".mm", ".c", ".cpp", ".hpp", ".json",
-        ".yaml", ".yml", ".toml", ".xml", ".plist", ".env", ".xcconfig",
-        ".rb", ".sh", ".bash", ".zsh", ".properties", ".txt", ".md",
-        ".sql", ".gradle", ".kts", ".entitlements", ".py"
+        # Apple / iOS / macOS
+        ".swift", ".h", ".m", ".mm", ".plist", ".xcconfig", ".entitlements",
+        # Android / JVM
+        ".kt", ".kts", ".java", ".gradle", ".properties", ".pro",
+        # Cross-platform mobile
+        ".dart", ".cs", ".vue", ".svelte",
+        # Web / scripting
+        ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".py", ".rb", ".php",
+        ".go", ".rs", ".c", ".cpp", ".hpp",
+        # Config & data
+        ".json", ".jsonc", ".yaml", ".yml", ".toml", ".xml", ".env", ".ini",
+        ".cfg", ".conf", ".tf", ".tfvars", ".sql", ".txt", ".md",
+        # Shell
+        ".sh", ".bash", ".zsh",
     })
     exact_filenames: Set[str] = field(default_factory=lambda: {
-        "Podfile", "Package.swift", "Cartfile", "Gemfile", "Fastfile",
-        "Appfile", "Matchfile", "GoogleService-Info.plist", "firebase.json",
-        "docker-compose.yml", "docker-compose.yaml", "credentials.json",
-        "service-account.json"
+        # Apple
+        "Podfile", "Package.swift", "Cartfile", "Fastfile", "Appfile",
+        "Matchfile", "GoogleService-Info.plist", "ExportOptions.plist",
+        # Android
+        "local.properties", "gradle.properties", "keystore.properties",
+        "signing.properties", "google-services.json", "agconnect-services.json",
+        "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts",
+        # Generic
+        "Gemfile", "firebase.json", "docker-compose.yml", "docker-compose.yaml",
+        "Dockerfile", "credentials.json", "service-account.json",
+        ".npmrc", ".netrc", ".pypirc",
     })
     enable_entropy: bool = True
     entropy_threshold: float = 4.5
@@ -196,6 +215,9 @@ class ScannerConfig:
     generate_json: bool = True
     generate_markdown: bool = True
     generate_text: bool = True
+    disabled_rule_ids: Set[str] = field(default_factory=set)
+    custom_keywords: Set[str] = field(default_factory=set)
+    custom_rules: List[PatternRule] = field(default_factory=list)
 
 
 

@@ -1,13 +1,13 @@
 # 🛡️ SecretScanner (SecretFinder)
 
-> **Production-grade secret audit & sensitive data scanner for iOS/macOS (Xcode/Swift) and cross-platform projects.**
+> **Production-grade secret audit & sensitive data scanner for mobile (iOS + Android) and cross-platform projects.**
 > Designed specifically for auditing codebases **before** sharing them with cloud AI assistants (*Claude Code, Gemini CLI, OpenAI Codex, GitHub Copilot, Cursor, etc.*).
 
 ---
 
 ## 🚀 Overview
 
-**SecretScanner** combines the power of **Gitleaks**, **TruffleHog**, and **Detect Secrets** into a single, high-performance Python 3.12+ engine with deep, dedicated rules for **iOS, macOS, Swift, and Xcode** environments.
+**SecretScanner** combines the power of **Gitleaks**, **TruffleHog**, and **Detect Secrets** into a single, high-performance Python engine with deep, dedicated rules for **iOS/Swift/Xcode** *and* **Android/Kotlin/Gradle**, plus the common web and backend stacks.
 
 It scans files, directory structures, and complete **Git histories** (*commits, branches, tags, stashes, and deleted files*) to prevent accidental leakage of proprietary API keys, private certificates, database URIs, and credentials.
 
@@ -15,31 +15,39 @@ It scans files, directory structures, and complete **Git histories** (*commits, 
 
 ## ✨ Features
 
-- 🖥️ **Desktop GUI Application**: Built-in graphical user interface (Tkinter / macOS native look) featuring project folder selection, custom file/directory exclusion controls, scan options, live progress logs, and a button to open interactive HTML reports in the browser.
-- 📱 **iOS/macOS & Swift First**: Audits `GoogleService-Info.plist`, `.p8` Apple AuthKeys, `.mobileprovision` profiles, `.p12` certificates, `Fastfile`/`Matchfile`, `.xcconfig`, `.entitlements`, and Swift string variable assignments.
-- 🔑 **Comprehensive API & Service Detection**: Detects keys for OpenAI, Anthropic, Google, AWS, Azure, GitHub, GitLab, Stripe, RevenueCat, OneSignal, Branch, Amplitude, Mixpanel, AppsFlyer, Sentry, Mapbox, Twilio, SendGrid, Supabase, Cloudflare, Databases (Postgres, MongoDB, Redis), JWT, Bearer tokens, and SSH keys.
-- 🧮 **Shannon Entropy Analysis**: Identifies high-entropy unquoted or quoted strings (> 20 chars) while avoiding false positives (UUIDs, SHA hashes, URLs, bundle identifiers).
+- 🖥️ **Desktop GUI Application**: Cyberpunk-themed Tkinter interface with project folder selection, exclusion controls, scan options, live progress logs, and one-click HTML report opening. Runs on **macOS and Windows**.
+- 📱 **iOS & Android, Equally**:
+  - *Apple*: `GoogleService-Info.plist`, `.p8` AuthKeys, `.mobileprovision`, `.p12`, `Fastfile`/`Matchfile`, `.xcconfig`, `.entitlements`, Swift assignments, Objective-C `#define` macros.
+  - *Android*: `local.properties`, `gradle.properties`, `keystore.properties`, signing credentials (`storePassword`/`keyAlias`), `google-services.json`, `buildConfigField`, Android string resources, Maps keys in `AndroidManifest.xml`.
+- 🧠 **Name-aware detection**: Catches secrets by *identifier name*, not just value shape — `MAPKIT_API_KEY = "0000…-4444"` is flagged even though a UUID has low entropy. Prefixed and camelCase names (`yandexApiKey`, `MY_APP_CLIENT_SECRET`) are covered, while lookalikes such as `tokenizer` or `keyPath` are not.
+- 🔑 **55+ built-in provider rules**: OpenAI, Anthropic, Hugging Face, Google/Firebase, AWS, Azure, Cloudflare, DigitalOcean, Supabase, GitHub, GitLab, npm, PyPI, Stripe, PayPal/Braintree, Square, RevenueCat, Mapbox, Yandex MapKit, 2GIS/HERE, Sentry, OneSignal, Amplitude, Mixpanel, AppsFlyer/Adjust/Branch, AppMetrica/VK, Slack, Telegram, Twilio, SendGrid, Discord, FCM, Postgres/MySQL/Mongo/Redis/JDBC, JWT, Bearer/Basic auth, SSH/PGP/RSA keys.
+- ⚙️ **Configurable rules UI**: Turn any individual check on or off, add your own **sensitive keywords** (no regex knowledge needed), or write full **custom regex rules** — all persisted between sessions.
+- 🧮 **Shannon Entropy Analysis**: Identifies high-entropy strings while filtering known false positives (URLs, SHA hashes, bundle identifiers).
 - 📜 **Full Git History Audit**: Scans historical commits, uncommitted working tree diffs, stashes, tags, and deleted files.
-- ⚡ **High Performance Concurrent Architecture**: Multi-threaded scanning utilizing `concurrent.futures` for lightning-fast auditing.
-- 📊 **Multi-Format Report Generation**: Outputs interactive `report.html`, structured `report.json`, GitHub-flavored `report.md`, and plain `report.txt`.
+- ⚡ **High Performance Concurrent Architecture**: Multi-threaded scanning with a rule set compiled once and shared across all files.
+- 📊 **Multi-Format Report Generation**: Interactive `report.html`, structured `report.json`, GitHub-flavored `report.md`, plain `report.txt`, with an optional **brief mode** that omits code context.
 
 ---
 
-## 📥 Download (macOS)
+## 📥 Download
 
-Grab the ready-to-run desktop app — no Python setup required:
+Ready-to-run desktop apps — no Python setup required. Get them from the
+**[latest release](https://github.com/LukichevSergey/SecretScanner/releases/latest)**:
 
-**[⬇️ Download SecretScanner.dmg](https://github.com/LukichevSergey/SecretScanner/releases/latest)**
+| Platform | File | How to run |
+| :--- | :--- | :--- |
+| macOS 11+ | `SecretScanner-macos.dmg` | Open the DMG, drag **SecretScanner** into `Applications`. On first launch right-click → **Open** (the app is unsigned). |
+| Windows 10+ | `SecretScanner-windows.zip` | Unzip and run `SecretScanner.exe`. SmartScreen may warn on first run → **More info** → **Run anyway** (the app is unsigned). |
 
-Open the `.dmg`, drag **SecretScanner** into `Applications`, and launch it. macOS may ask you to confirm opening an app from an unidentified developer on first launch (right-click → Open).
+Both builds are produced automatically by [GitHub Actions](.github/workflows/release.yml) from the tagged source.
 
 ---
 
 ## 🛠️ Installation & Requirements (running from source)
 
-- **Python Version**: Python 3.12+ (compatible with Python 3.9+)
+- **Python Version**: Python 3.12+ recommended (compatible with Python 3.9+)
 - **Dependencies**: Built purely with standard Python libraries (`tkinter`, `dataclasses`, `pathlib`, `concurrent.futures`, `re`, `json`, `subprocess`). No mandatory 3rd party packages required!
-- **GUI note**: on macOS, use a Python build with Tk 8.6+ (e.g. Homebrew's `python-tk`) — very old system Tk (8.5) fails to render the desktop UI correctly.
+- **GUI note**: use a Python build with Tk 8.6+. On macOS the very old system Tk 8.5 shipped with Xcode's Python fails to render the interface — install Homebrew's `python-tk` (`brew install python-tk`) and launch with that interpreter.
 
 ---
 
@@ -60,9 +68,10 @@ python3 scanner.py --gui
    - **Excluded Files**: Add custom files or patterns to ignore (e.g. `Podfile.lock, MySecretsMock.swift, *.testdata`).
 3. **Interactive Control & Options**: Toggle Git history analysis, adjust Shannon entropy thresholds, and control thread counts.
 4. **Brief Report Mode**: Toggle "Краткий отчёт" to strip the 20-line before/after code context and keep only the matched secret line — useful for smaller, easier-to-skim reports.
-5. **Live Execution Console**: Real-time log output displaying progress, findings breakdown, and errors.
-6. **One-Click HTML Report Viewer**: Opens `report.html` directly in your default browser.
-7. **Persistent Settings**: Every field and checkbox (project/output folders, exclusions, report formats, engine options) is remembered across restarts, stored in `~/.secretscanner/gui_settings.json`.
+5. **Rules Window** (`⚙ ПРАВИЛА ПОИСКА`): Enable or disable each of the built-in checks individually, grouped by category with risk badges. Add project-specific **keywords** (e.g. `mapkit`, `widgetly`) so any identifier containing them is audited, or add **custom regex rules** with a name and risk level — invalid regexes are rejected with an inline error.
+6. **Live Execution Console**: Real-time log output displaying progress, findings breakdown, and errors.
+7. **One-Click HTML Report Viewer**: Opens `report.html` directly in your default browser.
+8. **Persistent Settings**: Every field, checkbox and rule choice is remembered across restarts, stored in `~/.secretscanner/gui_settings.json` (override the location with the `SECRETSCANNER_SETTINGS` environment variable).
 
 
 ```bash
@@ -117,12 +126,13 @@ SecretFinder/
 │   ├── __init__.py
 │   ├── models.py              # Strongly typed Dataclasses & RiskLevel Enums
 │   ├── config.py              # Configuration manager & default exclusions
-│   ├── patterns.py            # API/Service regex rules & Swift assignments
+│   ├── patterns.py            # Provider rules, name-based detection, custom rules
 │   ├── entropy.py             # Shannon entropy & candidate extraction
 │   ├── git_scanner.py         # Full Git history, diff, and stash scanner
 │   ├── file_scanner.py        # Multi-threaded filesystem scanner
 │   ├── scanner.py             # Core Engine Orchestrator
 │   ├── cli.py                 # CLI parser & Tkinter GUI fallback
+│   ├── gui.py                 # Desktop console + rules configuration window
 │   ├── utils.py               # Redaction, binary detection & context slicing
 │   ├── report_json.py         # JSON report generator
 │   ├── report_html.py         # Dynamic interactive HTML dashboard
@@ -150,10 +160,21 @@ SecretFinder/
 - Fastlane Assets (`Fastfile`, `Appfile`, `Matchfile`)
 - Xcode Build Configs (`.xcconfig`, `.entitlements`)
 - Sensitive Swift Files (`Secrets.swift`, `LocalConfig.swift`, `Config.swift`)
-- Swift string assignments (`password`, `secret`, `token`, `clientSecret`, `privateKey`, `accessToken`, `authorization`, `bearer`, `apikey`, `jwt`, `credential`, etc.)
+- Swift/Objective-C assignments and `#define` macros holding keys, tokens or passwords
+- App Store Connect / Fastlane API credentials
 - Database files (`.sqlite`, `.realm`, CoreData SQLite databases, log files, crash dumps)
 
-### 2. Cloud & API Keys
+### 2. Android / Kotlin / Gradle Specific
+- Release signing credentials — `storePassword`, `keyPassword`, `keyAlias`, `storeFile`
+- `local.properties`, `gradle.properties`, `keystore.properties`, `signing.properties`
+- `google-services.json`, `agconnect-services.json` (Huawei)
+- `buildConfigField("String", "API_KEY", …)` literals baked into `BuildConfig`
+- Secrets in Android string resources (`res/values/*.xml`) — trivially extractable from an APK
+- Google Maps keys declared in `AndroidManifest.xml` (`com.google.android.geo.API_KEY`)
+- Kotlin/Java assignments (`const val`, `static final String`) holding keys or tokens
+- Keystores (`.jks`, `.keystore`) and ProGuard configs
+
+### 3. Cloud & API Keys
 - **AI Services**: OpenAI, Anthropic Claude, Google Gemini
 - **Cloud Providers**: AWS Access/Secret Keys, Azure Connection Strings, Google Cloud, Supabase, Cloudflare, DigitalOcean
 - **Developer Services**: GitHub (PATs/Tokens), GitLab, Bitbucket, Sentry, Bugsnag, Mapbox, HERE, Algolia, Twilio, SendGrid
@@ -162,15 +183,28 @@ SecretFinder/
 
 ---
 
-## 📦 Building the macOS App Yourself
+## 📦 Building the Apps Yourself
 
-The `.dmg` on the [Releases page](https://github.com/LukichevSergey/SecretScanner/releases) is built with `py2app`:
+Both binaries on the [Releases page](https://github.com/LukichevSergey/SecretScanner/releases) are produced by the
+[`Build & Release`](.github/workflows/release.yml) workflow, which runs the test suite and then builds on
+`macos-latest` and `windows-latest`. Push a `v*` tag (or run the workflow manually with a tag) and the
+artifacts are attached to that release automatically.
+
+To build locally:
+
+**macOS** (`py2app` → `.app` → `.dmg`):
 
 ```bash
 python3 -m venv .build-venv
 .build-venv/bin/pip install py2app
 .build-venv/bin/python setup.py py2app
-# -> dist/SecretScanner.app
+```
+
+**Windows** (`PyInstaller` → single `.exe`) — must be run *on* Windows, PyInstaller does not cross-compile:
+
+```bash
+pip install pyinstaller
+pyinstaller --noconfirm SecretScanner.spec
 ```
 
 Use a Python with Tk 8.6+ (see the GUI note above) so the bundled app renders correctly.

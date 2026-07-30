@@ -8,12 +8,12 @@ import os
 import re
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from secret_scanner.config import ScannerConfig
 from secret_scanner.entropy import extract_high_entropy_candidates
 from secret_scanner.models import Finding, MatchContext, PatternRule, RiskLevel
-from secret_scanner.patterns import get_all_rules
+from secret_scanner.patterns import resolve_active_rules
 from secret_scanner.utils import extract_context, is_binary_file, redact_secret
 
 # Special sensitive file names & extensions requiring special auditing
@@ -32,13 +32,34 @@ SENSITIVE_FILENAME_RULES = [
 ]
 
 
-def scan_single_file(file_path_str: str, config: ScannerConfig) -> Tuple[List[Finding], int, int]:
+def compile_rules(config: ScannerConfig) -> List[Tuple[PatternRule, "re.Pattern"]]:
+    """
+    Compile the active rule set once so it can be reused for every scanned file.
+
+    Rules whose regex fails to compile (e.g. a malformed user-supplied pattern)
+    are skipped rather than aborting the scan.
+    """
+    compiled: List[Tuple[PatternRule, re.Pattern]] = []
+    for rule in resolve_active_rules(config):
+        try:
+            compiled.append((rule, re.compile(rule.pattern)))
+        except Exception:
+            continue
+    return compiled
+
+
+def scan_single_file(
+    file_path_str: str,
+    config: ScannerConfig,
+    compiled_rules: Optional[List[Tuple[PatternRule, "re.Pattern"]]] = None,
+) -> Tuple[List[Finding], int, int]:
     """
     Scan a single file for secret patterns, entropy candidates, and filename risks.
-    
+
     Args:
         file_path_str: Absolute path string to target file.
         config: ScannerConfig configuration settings.
+        compiled_rules: Pre-compiled rules shared across files; built on demand if omitted.
 
     Returns:
         Tuple containing (List of Findings, 1 if file scanned else 0, total lines in file).
@@ -78,15 +99,8 @@ def scan_single_file(file_path_str: str, config: ScannerConfig) -> Tuple[List[Fi
         return findings, 1, 0
 
     line_count = len(lines)
-    rules = get_all_rules()
-
-    # Pre-compile rules into tuple pairs of (rule, compiled_regex)
-    compiled_rules: List[Tuple[PatternRule, re.Pattern]] = []
-    for rule in rules:
-        try:
-            compiled_rules.append((rule, re.compile(rule.pattern)))
-        except Exception:
-            continue
+    if compiled_rules is None:
+        compiled_rules = compile_rules(config)
 
     # 4. Scan content line by line
     for idx, line in enumerate(lines):
@@ -216,10 +230,13 @@ def scan_files(config: ScannerConfig) -> Tuple[List[Finding], int, int]:
 
     workers = max(1, min(config.max_workers, len(files_to_scan)))
 
+    # Compile the rule set once and share it across all worker threads
+    compiled_rules = compile_rules(config)
+
     # Use ThreadPoolExecutor for IO bound file operations
     with ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_file = {
-            executor.submit(scan_single_file, str(fpath), config): fpath
+            executor.submit(scan_single_file, str(fpath), config, compiled_rules): fpath
             for fpath in files_to_scan
         }
 

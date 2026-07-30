@@ -1,0 +1,104 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and attach artifacts to (e.g. v1.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # GUI tests detect a headless environment and skip themselves.
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+      - name: Build executable
+        run: pyinstaller --noconfirm SecretScanner.spec
+      - name: Smoke-test the executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/SecretScanner.exe)) { throw "SecretScanner.exe was not produced" }
+          $size = (Get-Item dist/SecretScanner.exe).Length
+          Write-Host "Built SecretScanner.exe ($([math]::Round($size/1MB,1)) MB)"
+          if ($size -lt 5MB) { throw "Executable is suspiciously small" }
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path dist/SecretScanner.exe -DestinationPath SecretScanner-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: SecretScanner-windows.zip
+
+  build-macos:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install py2app
+        run: pip install py2app
+      - name: Build app bundle
+        run: python setup.py py2app
+      - name: Package DMG
+        run: |
+          mkdir -p dist/dmg-src
+          cp -R dist/SecretScanner.app dist/dmg-src/
+          ln -s /Applications dist/dmg-src/Applications
+          hdiutil create -volname "SecretScanner" -srcfolder dist/dmg-src \
+            -ov -format UDZO SecretScanner-macos.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: SecretScanner-macos.dmg
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Attach binaries to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "SecretScanner $TAG" --generate-notes
+          fi
+          gh release upload "$TAG" \
+            artifacts/windows/SecretScanner-windows.zip \
+            artifacts/macos/SecretScanner-macos.dmg \
+            --repo "$GITHUB_REPOSITORY" --clobber
